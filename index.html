@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zalgo Text Generator</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #ffffff;
+    color: #222222;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     Chaotic Zalgo Background (GREEN)
+     ============================================================ */
+  #bgZalgo {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    font-family: "Noto Sans", "Arial Unicode MS", "Lucida Grande", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: opacity 0.3s ease;
+  }
+
+  #bgZalgo.disabled {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  #bgZalgo .chunk {
+    position: absolute;
+    white-space: nowrap;
+    overflow: visible;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  header, main, footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ============================================================
+     Layout
+     ============================================================ */
+  header {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+
+  .header-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .about-btn, .settings-btn {
+    background: #ffffff;
+    border: 1px solid #cccccc;
+    color: #333333;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font-family: inherit;
+  }
+
+  .about-btn:hover, .settings-btn:hover {
+    background-color: #f5f5f5;
+    border-color: #aaaaaa;
+  }
+
+  .settings-btn.active {
+    background-color: #f0f0f0;
+    border-color: #888888;
+  }
+
+  main {
+    width: 100%;
+    max-width: 800px;
+    padding: 20px 24px 60px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+  }
+
+  /* ============================================================
+     Settings Panel
+     ============================================================ */
+  .settings-panel {
+    display: none;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .settings-panel.active {
+    display: flex;
+  }
+
+  .settings-panel h2 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #333333;
+    letter-spacing: 0.3px;
+  }
+
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .setting-label .title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333333;
+  }
+
+  .setting-label .desc {
+    font-size: 0.78rem;
+    color: #888888;
+    line-height: 1.4;
+  }
+
+  /* Toggle Switch */
+  .toggle {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #cccccc;
+    border-radius: 26px;
+    transition: background-color 0.2s ease;
+  }
+
+  .toggle .slider::before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+
+  .toggle input:checked + .slider {
+    background-color: #2e7d32;
+  }
+
+  .toggle input:checked + .slider::before {
+    transform: translateX(20px);
+  }
+
+  /* ============================================================
+     Form Elements
+     ============================================================ */
+  label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #444444;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    font-size: 1rem;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    resize: vertical;
+    font-family: inherit;
+    background: #ffffff;
+    color: #222222;
+    outline: none;
+  }
+
+  textarea:focus { border-color: #888888; }
+
+  .output-area {
+    width: 100%;
+    min-height: 140px;
+    max-height: 320px;
+    padding: 12px;
+    font-size: 1.1rem;
+    font-family: "Noto Sans", "Arial Unicode MS", "Lucida Grande", sans-serif;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    background: #fafafa;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+
+  .slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #666666;
+    margin-top: 4px;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: #444444;
+  }
+
+  .intensity-value {
+    font-size: 0.9rem;
+    color: #555555;
+    text-align: center;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+
+  .intensity-value strong {
+    color: #222222;
+    font-size: 1rem;
+  }
+
+  .button-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    background: #ffffff;
+    border: 1px solid #cccccc;
+    color: #333333;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font-family: inherit;
+  }
+
+  button:hover {
+    background-color: #f5f5f5;
+    border-color: #aaaaaa;
+  }
+
+  button:active { background-color: #eeeeee; }
+
+  .copy-status {
+    font-size: 0.85rem;
+    color: #2e7d32;
+    min-height: 1.2em;
+    margin-top: -8px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    color: #555555;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 8px;
+  }
+
+  .stats-bar .stat {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+
+  .stats-bar .stat strong {
+    color: #222222;
+    font-weight: 600;
+  }
+
+  .stats-bar .stat .arrow { color: #999999; }
+  .stats-bar .stat .delta { color: #b06a00; font-weight: 600; }
+
+  /* ============================================================
+     Modal
+     ============================================================ */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    z-index: 200;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: #ffffff;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    max-width: 480px;
+    width: 100%;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .modal h2 { margin: 0 0 12px 0; font-size: 1.1rem; }
+
+  .modal p {
+    font-size: 0.9rem;
+    color: #444444;
+    line-height: 1.6;
+    margin: 0 0 12px 0;
+  }
+
+  .modal p:last-of-type { margin-bottom: 20px; }
+
+  .modal .close-btn { width: 100%; }
+
+  footer {
+    margin-top: auto;
+    padding: 16px;
+    font-size: 0.8rem;
+    color: #999999;
+    text-align: center;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div id="bgZalgo" aria-hidden="true"></div>
+
+<header>
+  <h1>Zalgo Text Generator</h1>
+  <div class="header-buttons">
+    <button class="settings-btn" id="settingsBtn">Settings</button>
+    <button class="about-btn" id="aboutBtn">About</button>
+  </div>
+</header>
+
+<main>
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <h2>Settings</h2>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <span class="title">Animated background</span>
+        <span class="desc">Shows a green, flickering Zalgo field in the background.</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="bgToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div>
+    <label for="inputText">Enter text:</label>
+    <textarea id="inputText" placeholder="Type your text here..."></textarea>
+  </div>
+
+  <div class="slider-row">
+    <label for="marks">Marks per character:</label>
+    <input type="range" id="marks" min="5" max="200" step="5" value="30">
+    <div class="slider-labels">
+      <span>5 (light)</span>
+      <span>200 (max for macOS)</span>
+    </div>
+    <div class="intensity-value">
+      Current: <strong id="marksValue">30</strong> marks per character
+    </div>
+  </div>
+
+  <div class="button-row">
+    <button id="generateBtn">Generate glitch</button>
+    <button id="copyBtn">Copy</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <div class="copy-status" id="copyStatus"></div>
+
+  <div>
+    <label>Result:</label>
+    <div class="output-area" id="output"></div>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat">
+        <span>Input:</span>
+        <strong id="statInput">0</strong>
+        <span class="arrow">→</span>
+        <strong id="statOutput">0</strong>
+        <span>characters</span>
+      </div>
+      <div class="stat">
+        <span>Growth:</span>
+        <strong class="delta" id="statDelta">+0</strong>
+        <span id="statFactor">(×1.00)</span>
+      </div>
+      <div class="stat">
+        <span>Bytes (UTF-8):</span>
+        <strong id="statBytes">0</strong>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Made by lzwdev &middot; Last updated 17. Nov 2026
+</footer>
+
+<!-- About Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>About this tool</h2>
+    <p>This generator creates so-called <strong>Zalgo text</strong>. Use the slider to choose how many marks per character are applied – the default is <strong>30</strong>, with a maximum of 200 (macOS limit).</p>
+    <p>The background is a <strong>green, chaotic Zalgo field</strong> that is re-randomized every 75 ms. You can disable it anytime via <strong>Settings</strong>.</p>
+    <p>Only classic, well-supported combining characters (U+0300–U+036F) are used so the text renders cleanly – no tofu boxes or thick lines.</p>
+    <p>The character counter below shows how many characters (and UTF-8 bytes) your result actually uses.</p>
+    <button class="close-btn" id="closeModalBtn">Close</button>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     macOS-safe Zalgo characters
+     ============================================================ */
+
+  const upMarks = [
+    '\u0300','\u0301','\u0302','\u0303','\u0304','\u0305','\u0306','\u0307',
+    '\u0308','\u0309','\u030A','\u030B','\u030C','\u030D','\u030E','\u030F',
+    '\u0310','\u0311','\u0312','\u0313','\u0314',
+    '\u033D','\u033E','\u033F','\u0342','\u0343','\u0344',
+    '\u0346','\u034A','\u034B','\u034C','\u0350','\u0351','\u0352','\u0357',
+    '\u035B','\u0363','\u0364','\u0365','\u0366','\u0367','\u0368','\u0369',
+    '\u036A','\u036B','\u036C','\u036D','\u036E','\u036F'
+  ];
+
+  const downMarks = [
+    '\u0316','\u0317','\u0318','\u0319','\u031C','\u031D','\u031E','\u031F',
+    '\u0320','\u0321','\u0322','\u0323','\u0324','\u0325','\u0326','\u0327',
+    '\u0328','\u0329','\u032A','\u032B','\u032C','\u032D','\u032E','\u032F',
+    '\u0330','\u0331','\u0332','\u0333',
+    '\u0339','\u033A','\u033B','\u033C',
+    '\u0345','\u0347','\u0348','\u0349','\u034D','\u034E',
+    '\u0353','\u0354','\u0355','\u0356','\u0359','\u035A'
+  ];
+
+  /* ============================================================
+     DOM references
+     ============================================================ */
+  const inputText   = document.getElementById('inputText');
+  const marksSlider = document.getElementById('marks');
+  const marksValue  = document.getElementById('marksValue');
+  const output      = document.getElementById('output');
+  const generateBtn = document.getElementById('generateBtn');
+  const copyBtn     = document.getElementById('copyBtn');
+  const clearBtn    = document.getElementById('clearBtn');
+  const copyStatus  = document.getElementById('copyStatus');
+  const bgZalgo     = document.getElementById('bgZalgo');
+
+  const statInput  = document.getElementById('statInput');
+  const statOutput = document.getElementById('statOutput');
+  const statDelta  = document.getElementById('statDelta');
+  const statFactor = document.getElementById('statFactor');
+  const statBytes  = document.getElementById('statBytes');
+
+  const settingsBtn   = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const bgToggle      = document.getElementById('bgToggle');
+
+  const aboutBtn      = document.getElementById('aboutBtn');
+  const modalOverlay  = document.getElementById('modalOverlay');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+
+  /* ============================================================
+     Helpers
+     ============================================================ */
+  function randomFrom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function distributeMarks(total) {
+    const up   = Math.round(total * 0.5);
+    const down = total - up;
+    return { up, down };
+  }
+
+  function zalgoify(text, marksPerChar) {
+    const dist = distributeMarks(marksPerChar);
+    let result = '';
+    for (const char of text) {
+      if (/\s/.test(char)) {
+        result += char;
+        continue;
+      }
+      result += char;
+      for (let i = 0; i < dist.up; i++)   result += randomFrom(upMarks);
+      for (let i = 0; i < dist.down; i++) result += randomFrom(downMarks);
+    }
+    return result;
+  }
+
+  function utf8ByteLength(str) {
+    if (typeof TextEncoder !== 'undefined') {
+      return new TextEncoder().encode(str).length;
+    }
+    let bytes = 0;
+    for (const ch of str) {
+      const code = ch.codePointAt(0);
+      if (code <= 0x7F) bytes += 1;
+      else if (code <= 0x7FF) bytes += 2;
+      else if (code <= 0xFFFF) bytes += 3;
+      else bytes += 4;
+    }
+    return bytes;
+  }
+
+  function updateMarksLabel() {
+    marksValue.textContent = marksSlider.value;
+  }
+
+  function updateStats(inputStr, outputStr) {
+    const inLen  = inputStr.length;
+    const outLen = outputStr.length;
+    const delta  = outLen - inLen;
+    const factor = inLen > 0 ? (outLen / inLen) : 0;
+    const bytes  = utf8ByteLength(outputStr);
+
+    statInput.textContent  = inLen.toLocaleString('en-US');
+    statOutput.textContent = outLen.toLocaleString('en-US');
+    statDelta.textContent  = (delta >= 0 ? '+' : '') + delta.toLocaleString('en-US');
+    statFactor.textContent = '(×' + factor.toFixed(2) + ')';
+    statBytes.textContent  = bytes.toLocaleString('en-US');
+  }
+
+  /* ============================================================
+     Chaotic GREEN background
+     ============================================================ */
+
+  const BG_MARKS    = 30;
+  const BG_INTERVAL = 75;
+  const BG_WORDS    = ['ZALGO', 'GLITCH', 'ERROR', 'NULL', '404', 'SYS', 'DATA', 'X'];
+
+  const BG_GREENS = [
+    'rgba(34, 139, 34, ALPHA)',
+    'rgba(0, 128, 0, ALPHA)',
+    'rgba(46, 125, 50, ALPHA)',
+    'rgba(76, 175, 80, ALPHA)',
+    'rgba(27, 94, 32, ALPHA)',
+    'rgba(0, 150, 136, ALPHA)'
+  ];
+
+  let bgTimer = null;
+  let bgChunks = [];
+  let bgEnabled = true;
+
+  function buildChaoticBackground() {
+    bgZalgo.innerHTML = '';
+    bgChunks = [];
+
+    const w = window.innerWidth;
+    const h = Math.max(window.innerHeight, document.body.scrollHeight);
+
+    const areaFactor = (w * h) / (1280 * 720);
+    const baseCount  = 60;
+    const count = Math.max(20, Math.min(110, Math.round(baseCount * areaFactor)));
+
+    const frag = document.createDocumentFragment();
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'chunk';
+
+      let fontSize;
+      const r = Math.random();
+      if (r < 0.52)      fontSize = randInt(12, 22);
+      else if (r < 0.84) fontSize = randInt(22, 40);
+      else if (r < 0.96) fontSize = randInt(40, 68);
+      else               fontSize = randInt(68, 120);
+
+      const left = randInt(-60, w + 20);
+      const top  = randInt(-40, h + 20);
+
+      const word = BG_WORDS[randInt(0, BG_WORDS.length - 1)];
+      const repeat = randInt(1, 3);
+      const baseText = (word + ' ').repeat(repeat).trim();
+
+      const alpha = (Math.random() * 0.10 + 0.03).toFixed(3);
+      const greenTemplate = BG_GREENS[randInt(0, BG_GREENS.length - 1)];
+      const color = greenTemplate.replace('ALPHA', alpha);
+
+      el.style.left = left + 'px';
+      el.style.top  = top + 'px';
+      el.style.fontSize = fontSize + 'px';
+      el.style.color = color;
+      el.style.transform = 'rotate(' + randInt(-6, 6) + 'deg)';
+
+      el.textContent = zalgoify(baseText, BG_MARKS);
+
+      bgChunks.push({ el, baseText });
+      frag.appendChild(el);
+    }
+
+    bgZalgo.appendChild(frag);
+  }
+
+  function refreshChaoticBackground() {
+    for (const chunk of bgChunks) {
+      const marks = randInt(25, 35);
+      chunk.el.textContent = zalgoify(chunk.baseText, marks);
+    }
+  }
+
+  function startBackground() {
+    if (!bgEnabled) return;
+    buildChaoticBackground();
+    refreshChaoticBackground();
+    if (bgTimer) clearInterval(bgTimer);
+    bgTimer = setInterval(refreshChaoticBackground, BG_INTERVAL);
+  }
+
+  function stopBackground() {
+    if (bgTimer) {
+      clearInterval(bgTimer);
+      bgTimer = null;
+    }
+  }
+
+  /* ============================================================
+     Foreground actions
+     ============================================================ */
+  function generate() {
+    const text  = inputText.value;
+    const marks = parseInt(marksSlider.value, 10);
+
+    if (!text.trim()) {
+      output.textContent = '';
+      updateStats('', '');
+      copyStatus.textContent = '';
+      return;
+    }
+
+    const heavy = marks >= 120;
+    if (heavy) {
+      copyStatus.style.color = '#b06a00';
+      copyStatus.textContent = 'Generating text with ' + marks + ' marks/character…';
+    }
+
+    setTimeout(() => {
+      const result = zalgoify(text, marks);
+      output.textContent = result;
+      updateStats(text, result);
+      if (heavy) copyStatus.textContent = '';
+    }, heavy ? 10 : 0);
+  }
+
+  async function copyOutput() {
+    const text = output.textContent;
+    if (!text) {
+      copyStatus.style.color = '#b71c1c';
+      copyStatus.textContent = 'Nothing to copy.';
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      copyStatus.style.color = '#2e7d32';
+      copyStatus.textContent = 'Copied to clipboard!';
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        copyStatus.style.color = '#2e7d32';
+        copyStatus.textContent = 'Copied to clipboard!';
+      } catch (e) {
+        copyStatus.style.color = '#b71c1c';
+        copyStatus.textContent = 'Copy failed.';
+      }
+      document.body.removeChild(ta);
+    }
+  }
+
+  function clearAll() {
+    inputText.value = '';
+    output.textContent = '';
+    copyStatus.textContent = '';
+    updateStats('', '');
+    inputText.focus();
+  }
+
+  /* ============================================================
+     Events
+     ============================================================ */
+  marksSlider.addEventListener('input', updateMarksLabel);
+  generateBtn.addEventListener('click', generate);
+  copyBtn.addEventListener('click', copyOutput);
+  clearBtn.addEventListener('click', clearAll);
+
+  inputText.addEventListener('input', () => {
+    if (inputText.value.trim() === '') {
+      output.textContent = '';
+      updateStats('', '');
+    } else {
+      updateStats(inputText.value, output.textContent);
+    }
+  });
+
+  // Settings panel open/close
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.classList.toggle('active');
+    settingsBtn.classList.toggle('active');
+  });
+
+  // Background toggle
+  bgToggle.addEventListener('change', () => {
+    bgEnabled = bgToggle.checked;
+    if (bgEnabled) {
+      bgZalgo.classList.remove('disabled');
+      startBackground();
+    } else {
+      bgZalgo.classList.add('disabled');
+      stopBackground();
+    }
+  });
+
+  // Modal
+  aboutBtn.addEventListener('click', () => modalOverlay.classList.add('active'));
+  closeModalBtn.addEventListener('click', () => modalOverlay.classList.remove('active'));
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) modalOverlay.classList.remove('active');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') modalOverlay.classList.remove('active');
+  });
+
+  // Resize
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (bgEnabled) {
+        buildChaoticBackground();
+        refreshChaoticBackground();
+      }
+    }, 200);
+  });
+
+  // Tab switch: pause timer
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopBackground();
+    } else if (bgEnabled) {
+      startBackground();
+    }
+  });
+
+  // Initial
+  updateMarksLabel();
+  updateStats('', '');
+  startBackground();
+</script>
+
+</body>
+</html>
