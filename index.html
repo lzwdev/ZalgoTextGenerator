@@ -167,6 +167,26 @@
     line-height: 1.4;
   }
 
+  /* Info-Box für erkanntes OS */
+  .os-info {
+    background: #f0f7f0;
+    border: 1px solid #c8e6c9;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #2e7d32;
+    line-height: 1.5;
+  }
+
+  .os-info strong {
+    color: #1b5e20;
+    font-weight: 600;
+  }
+
+  .os-info .os-limit {
+    color: #555555;
+  }
+
   /* Toggle Switch */
   .toggle {
     position: relative;
@@ -424,6 +444,10 @@
         <span class="slider"></span>
       </label>
     </div>
+
+    <div class="os-info" id="osInfo">
+      Detecting operating system…
+    </div>
   </div>
 
   <div>
@@ -436,7 +460,7 @@
     <input type="range" id="marks" min="5" max="200" step="5" value="30">
     <div class="slider-labels">
       <span>5 (light)</span>
-      <span>200 (max for macOS)</span>
+      <span id="marksMaxLabel">200 (max)</span>
     </div>
     <div class="intensity-value">
       Current: <strong id="marksValue">30</strong> marks per character
@@ -484,7 +508,8 @@
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h2>About this tool</h2>
-    <p>This generator creates so-called <strong>Zalgo text</strong>. Use the slider to choose how many marks per character are applied – the default is <strong>30</strong>, with a maximum of 200 (macOS limit).</p>
+    <p>This generator creates so-called <strong>Zalgo text</strong>. Use the slider to choose how many marks per character are applied – the default is <strong>30</strong>.</p>
+    <p>The <strong>maximum</strong> number of marks is adjusted automatically based on your operating system, since some systems render stacked combining characters less cleanly than others (macOS in particular). Unknown systems get a generous limit of <strong>300</strong>.</p>
     <p>The background is a <strong>green, chaotic Zalgo field</strong> that is re-randomized every 75 ms. You can disable it anytime via <strong>Settings</strong>.</p>
     <p>Only classic, well-supported combining characters (U+0300–U+036F) are used so the text renders cleanly – no tofu boxes or thick lines.</p>
     <p>The character counter below shows how many characters (and UTF-8 bytes) your result actually uses.</p>
@@ -523,6 +548,7 @@
   const inputText   = document.getElementById('inputText');
   const marksSlider = document.getElementById('marks');
   const marksValue  = document.getElementById('marksValue');
+  const marksMaxLabel = document.getElementById('marksMaxLabel');
   const output      = document.getElementById('output');
   const generateBtn = document.getElementById('generateBtn');
   const copyBtn     = document.getElementById('copyBtn');
@@ -539,10 +565,72 @@
   const settingsBtn   = document.getElementById('settingsBtn');
   const settingsPanel = document.getElementById('settingsPanel');
   const bgToggle      = document.getElementById('bgToggle');
+  const osInfo        = document.getElementById('osInfo');
 
   const aboutBtn      = document.getElementById('aboutBtn');
   const modalOverlay  = document.getElementById('modalOverlay');
   const closeModalBtn = document.getElementById('closeModalBtn');
+
+  /* ============================================================
+     OS Detection
+     ============================================================ */
+  function detectOS() {
+    const ua = navigator.userAgent || '';
+    const platform = (navigator.userAgentData && navigator.userAgentData.platform)
+                     || navigator.platform || '';
+
+    // iOS zuerst prüfen (iPhone/iPad), da es auch "Mac" enthalten kann
+    if (/iPad|iPhone|iPod/.test(ua) ||
+        (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+      return 'ios';
+    }
+    if (/Android/i.test(ua)) {
+      return 'android';
+    }
+    if (/Mac OS X|Macintosh/i.test(ua) || /^Mac/i.test(platform)) {
+      return 'macos';
+    }
+    if (/Windows/i.test(ua) || /^Win/i.test(platform)) {
+      return 'windows';
+    }
+    if (/Linux/i.test(ua) || /Linux/i.test(platform)) {
+      return 'linux';
+    }
+    return 'unknown';
+  }
+
+  // Limit pro Betriebssystem (max marks per character)
+  const OS_CONFIG = {
+    macos:   { name: 'macOS',        limit: 200, note: 'Core Text renders dense stacking poorly – capped for clean output.' },
+    ios:     { name: 'iOS',          limit: 200, note: 'Same rendering engine as macOS – capped for clean output.' },
+    windows: { name: 'Windows',      limit: 400, note: 'DirectWrite handles dense stacking well.' },
+    android: { name: 'Android',      limit: 350, note: 'Rendering quality varies by device and browser.' },
+    linux:   { name: 'Linux',        limit: 350, note: 'Rendering quality varies by font and desktop environment.' },
+    unknown: { name: 'Unknown OS',   limit: 300, note: 'Fallback limit for unrecognized systems.' }
+  };
+
+  const detectedOS = detectOS();
+  const osConfig = OS_CONFIG[detectedOS];
+
+  function applyOSConfig() {
+    // Slider-Maximum an das OS-Limit anpassen
+    marksSlider.max = osConfig.limit;
+
+    // Slider-Label rechts aktualisieren
+    marksMaxLabel.textContent = osConfig.limit + ' (max for ' + osConfig.name + ')';
+
+    // Falls aktueller Wert über dem Limit liegt, auf Limit setzen
+    if (parseInt(marksSlider.value, 10) > osConfig.limit) {
+      marksSlider.value = osConfig.limit;
+    }
+    updateMarksLabel();
+
+    // Info-Box im Settings-Panel füllen
+    osInfo.innerHTML =
+      'Detected OS: <strong>' + osConfig.name + '</strong><br>' +
+      '<span class="os-limit">Max marks per character: <strong>' + osConfig.limit + '</strong> — ' +
+      osConfig.note + '</span>';
+  }
 
   /* ============================================================
      Helpers
@@ -716,7 +804,7 @@
       return;
     }
 
-    const heavy = marks >= 120;
+    const heavy = marks >= Math.min(120, osConfig.limit * 0.6);
     if (heavy) {
       copyStatus.style.color = '#b06a00';
       copyStatus.textContent = 'Generating text with ' + marks + ' marks/character…';
@@ -835,7 +923,7 @@
   });
 
   // Initial
-  updateMarksLabel();
+  applyOSConfig();
   updateStats('', '');
   startBackground();
 </script>
